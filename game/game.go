@@ -1,7 +1,6 @@
 package game
 
 import (
-	"errors"
 	"fmt"
 	"strconv"
 )
@@ -115,6 +114,19 @@ func (b *Board) diagonalWin(x int, y int, stone int) bool {
 	return win
 }
 
+// GetAlllegalmoves returns an array containing every coordinates with a free space
+func (b *Board) GetAllLegalMoves() [][2]int {
+	allMoves := make([][2]int, 0, BOARDSIZE*BOARDSIZE)
+	for y, line := range b {
+		for x, cell := range line {
+			if cell == 0 {
+				allMoves = append(allMoves, [2]int{x, y})
+			}
+		}
+	}
+	return allMoves
+}
+
 // IsMoveWinning checks if the x and y placed stone is a winning move
 func (b *Board) IsMoveWinning(x int, y int, stone int) bool {
 	return (b.horizontalWin(x, y, stone) || b.verticalWin(x, y, stone) || b.diagonalWin(x, y, stone))
@@ -125,8 +137,12 @@ func (b *Board) IsMoveWinning(x int, y int, stone int) bool {
 // It returns an error if a stone is already on these coordinates.
 func (b *Board) Play(x int, y int, stone int) (int, error) {
 
+	if x < 0 || x >= BOARDSIZE || y < 0 || y >= BOARDSIZE {
+		return 0, fmt.Errorf("ERROR: you can't place a stone outside of the board's range")
+	}
+
 	if b[y][x] != 0 {
-		return 0, errors.New("ERROR: you can't place a stone on coordinates X:" + strconv.Itoa(x) + " Y:" + strconv.Itoa(y) + "\n       there is already a stone placed there\n")
+		return 0, fmt.Errorf("ERROR: you can't place a stone on coordinates X:" + strconv.Itoa(x) + " Y:" + strconv.Itoa(y) + " since there is already a stone placed there")
 	}
 	b[y][x] = stone
 
@@ -135,6 +151,11 @@ func (b *Board) Play(x int, y int, stone int) (int, error) {
 	}
 
 	return 0, nil
+}
+
+// GetValue is used to get the value ob *Board
+func (b *Board) GetValue() Board {
+	return *b
 }
 
 // Print prints the board in a pretty way with
