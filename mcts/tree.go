@@ -1,10 +1,15 @@
 package mcts
 
 import (
+	"math"
 	"math/rand"
 	"time"
 
 	"github.com/DamienBirtel/SimpleGomoku/game"
+)
+
+const (
+	C = 1.4
 )
 
 type Tree struct {
@@ -12,32 +17,36 @@ type Tree struct {
 }
 
 type Node struct {
-	id            [2]int
-	nbVisit       int
-	nbWins        int
-	playing       int
-	state         game.Board
-	untestedMoves [][2]int
-	testedMoves   [][2]int
-	parent        *Node
-	children      []*Node
-	bestChild     *Node
+	id                 [2]int
+	nbVisit            int
+	nbWins             int
+	score              float64
+	playing            int
+	state              game.Board
+	untestedMoves      [][2]int
+	testedMoves        [][2]int
+	parent             *Node
+	children           []*Node
+	bestChild          *Node
+	mostPromisingChild *Node
 }
 
 func NewNode(state *game.Board, parent *Node, moveToGetHere [2]int, stone int) *Node {
 	moves := state.GetAllLegalMoves()
 	children := make([]*Node, 0, len(moves))
 	return &Node{
-		id:            moveToGetHere,
-		nbVisit:       0,
-		nbWins:        0,
-		playing:       stone,
-		state:         *state,
-		untestedMoves: moves,
-		testedMoves:   [][2]int{},
-		parent:        parent,
-		children:      children,
-		bestChild:     nil,
+		id:                 moveToGetHere,
+		nbVisit:            0,
+		nbWins:             0,
+		score:              0.0,
+		playing:            stone,
+		state:              *state,
+		untestedMoves:      moves,
+		testedMoves:        [][2]int{},
+		parent:             parent,
+		children:           children,
+		bestChild:          nil,
+		mostPromisingChild: nil,
 	}
 }
 
@@ -65,11 +74,19 @@ func (n *Node) Simulate() {
 }
 
 func (n *Node) Backpropagate(winner int) {
-	for n.parent != nil {
-		n = n.parent
-		n.nbVisit++
-		n.nbWins -= winner
-		// TODO
+	node := n
+	for node.parent != nil {
+		p := node.parent
+		node.nbVisit++
+		node.nbWins -= winner
+		node.score = float64(node.nbWins)/float64(node.nbVisit) + C*math.Sqrt(math.Log(float64(p.nbVisit))/float64(node.nbVisit))
+		if p.mostPromisingChild == nil || node.score > p.mostPromisingChild.score {
+			p.mostPromisingChild = node
+		}
+		if p.bestChild == nil || node.nbVisit > p.bestChild.nbVisit {
+			p.bestChild = node
+		}
+		node = n.parent
 	}
 }
 
@@ -78,8 +95,9 @@ func NewTree(initialState *game.Board, whosTurn int) *Tree {
 }
 
 func (t *Tree) GetBestMove() [2]int {
-	randomIndex := rand.Intn(len(t.root.testedMoves))
-	return t.root.testedMoves[randomIndex]
+	t.root = t.root.bestChild
+	t.root.parent = nil
+	return t.root.id
 }
 
 func (t *Tree) GetLeaf() *Node {
@@ -107,7 +125,6 @@ func (t *Tree) ComputeMCTS(c chan [2]int, stopChan chan struct{}, playChan chan 
 			return
 		case <-playChan:
 			bestMove := t.GetBestMove()
-			//t.root.parent = nil
 			c <- bestMove
 		case playedMoves := <-c:
 			for i, child := range t.root.children {
